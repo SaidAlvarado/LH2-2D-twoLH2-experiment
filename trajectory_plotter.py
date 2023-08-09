@@ -212,12 +212,12 @@ def fil_solve_2d(pts_a, pts_b):
     t1 = (e*v1+f*v3).reshape((3,1))
     t2 = (e*v1-f*v3).reshape((3,1))
 
-    if (n1[2]<0):
-        t1 = -t1
-        n1 = -n1
-    elif (n2[2]<0):
-        t2 = -t2
-        n2 = -n2
+    # if (n1[2]<0):
+    #     t1 = -t1
+    #     n1 = -n1
+    # elif (n2[2]<0):
+    #     t2 = -t2
+    #     n2 = -n2
 
     fil = {'R1' : R1,
            'R2' : R2,
@@ -407,33 +407,33 @@ def plot_reconstructed_3D_scene(point3D, t_star, R_star, calib_data=None, exp_da
     ax.set_proj_type('ortho')
     # First lighthouse:
     arrow_size = 10
-    ax.quiver(0,0,0,arrow_size,0,0,color='xkcd:blue',lw=3)
-    ax.quiver(0,0,0,0,0,-arrow_size,color='xkcd:red',lw=3)
-    ax.quiver(0,0,0,0,arrow_size,0,color='xkcd:green',lw=3)
+    ax.quiver(0,0,0, -arrow_size,0,0, color='xkcd:blue',lw=3)
+    ax.quiver(0,0,0, 0,arrow_size,0, color='xkcd:red',lw=3)
+    ax.quiver(0,0,0, 0,0,-arrow_size, color='xkcd:green',lw=3)
 
     # Second lighthouse:
     t_star_rotated = np.array([t_star.item(0), t_star.item(1), t_star.item(2)])
     print(R_star)
     print(t_star_rotated)
-    x_axis = np.array([arrow_size,0,0])@np.linalg.inv(R_star)
+    x_axis = np.array([-arrow_size,0,0])@np.linalg.inv(R_star)
     y_axis = np.array([0,arrow_size,0])@np.linalg.inv(R_star)
-    z_axis = np.array([0,0,arrow_size])@np.linalg.inv(R_star)
-    ax.quiver(t_star_rotated[0],t_star_rotated[2],-t_star_rotated[1],x_axis[0],x_axis[2],-x_axis[1], color='xkcd:blue',lw=3)
-    ax.quiver(t_star_rotated[0],t_star_rotated[2],-t_star_rotated[1],y_axis[0],y_axis[2],-y_axis[1],color='xkcd:red',lw=3)
-    ax.quiver(t_star_rotated[0],t_star_rotated[2],-t_star_rotated[1],z_axis[0],z_axis[2],-z_axis[1],color='xkcd:green',lw=3)
-    ax.scatter(point3D[:,0],point3D[:,2],-point3D[:,1], alpha=0.1)
+    z_axis = np.array([0,0,-arrow_size])@np.linalg.inv(R_star)
+    ax.quiver(t_star_rotated[0],t_star_rotated[1],t_star_rotated[2],x_axis[0],x_axis[1],x_axis[2], color='xkcd:blue',lw=3)
+    ax.quiver(t_star_rotated[0],t_star_rotated[1],t_star_rotated[2],y_axis[0],y_axis[1],y_axis[2],color='xkcd:red',lw=3)
+    ax.quiver(t_star_rotated[0],t_star_rotated[1],t_star_rotated[2],z_axis[0],z_axis[1],z_axis[2],color='xkcd:green',lw=3)
+    ax.scatter(point3D[:,0],point3D[:,1],point3D[:,2], alpha=0.1)
 
     # Plot the calibration points in the LHA reference frame
     if calib_data is not None:
         calib_lh2 = np.array([calib_data['corners_lh2_3D_scaled'][corner] for corner in ['tl','tr','bl','br']]).reshape((4,3)) # originally it came out as shape=(3,1,4), I'm removing th uneeded dimension
-        ax.scatter(calib_lh2[:,0],calib_lh2[:,2],-calib_lh2[:,1], alpha=0.5, color="xkcd:red")
+        ax.scatter(calib_lh2[:,0],calib_lh2[:,1],calib_lh2[:,2], alpha=0.5, color="xkcd:red")
 
     # Plot the Camera points, calibration and data
     if calib_data is not None and exp_data is not None:
         calib_cam = np.array([calib_data['corners_px_Rt'][corner] for corner in ['tl','tr','bl','br']])
-        ax.scatter(calib_cam[:,0],calib_cam[:,2],-calib_cam[:,1], alpha=0.5, color="xkcd:orange")
+        ax.scatter(calib_cam[:,0],calib_cam[:,1],calib_cam[:,2], alpha=0.5, color="xkcd:orange")
         cam_point3D = exp_data[['x','y','z']].values
-        ax.scatter(cam_point3D[:,0], cam_point3D[:,2], -cam_point3D[:,1], alpha=0.01, color="xkcd:gray")
+        # ax.scatter(cam_point3D[:,0], cam_point3D[:,1], cam_point3D[:,2], alpha=0.01, color="xkcd:gray")
         # cam_point3D_Rt = exp_data[['Rt_x','Rt_y','Rt_z']].values
         # ax.scatter(cam_point3D_Rt[:,0], cam_point3D_Rt[:,2], -cam_point3D_Rt[:,1], alpha=0.01, color="xkcd:gray")
 
@@ -452,7 +452,7 @@ def plot_reconstructed_3D_scene(point3D, t_star, R_star, calib_data=None, exp_da
 
     # Plot the real 
     ax.text(-0.18,-0.1,0,s='LHA')
-    ax.text(t_star_rotated[0], t_star_rotated[2], -t_star_rotated[1],s='LHB')
+    ax.text(t_star_rotated[0], t_star_rotated[1], t_star_rotated[2],s='LHB')
 
     ax.axis('equal')
     ax.set_title('2D solved scene - 3D triangulated Points')
@@ -552,8 +552,8 @@ if __name__ == "__main__":
         # Add The 3D point to the Dataframe that has the real coordinates, timestamps etc.
         # This will help correlate which point are supposed to go where.
         df[color]['LH_x'] = point3D[:,0]
-        df[color]['LH_y'] = point3D[:,2]   # We need to invert 2 of the axis because the LH2 frame Z == depth and Y == Height
-        df[color]['LH_z'] = point3D[:,1]   # But the dataset assumes X = Horizontal, Y = Depth, Z = Height
+        df[color]['LH_y'] = point3D[:,1]   # We need to invert 2 of the axis because the LH2 frame Z == depth and Y == Height
+        df[color]['LH_z'] = point3D[:,2]   # But the dataset assumes X = Horizontal, Y = Depth, Z = Height
 
         #############################################################################
         ###                             Plotting                                  ###
