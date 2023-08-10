@@ -311,20 +311,23 @@ def scale_LH2_to_real_size(calib_data, point3D):
 
 def scale_cam_to_real_size(calib_data, exp_data):
     
-    # Grab the point at top-left and bottom-right and scale them to be the corners of a 40cm square and use them to calibrate/scale the system.
-    scale_p1 = calib_data['corners_px']['tl']
-    scale_p2 = calib_data['corners_px']['br']
-    scale = np.sqrt(2) * 40 / np.linalg.norm(scale_p2 - scale_p1)
-    # Scale all the 3D points
-    exp_data['x'] *= scale
-    exp_data['y'] *= scale
+    pts_src = np.array([calib_data['corners_px']['tl'], calib_data['corners_px']['tr'], calib_data['corners_px']['br'], calib_data['corners_px']['bl']])
+    pts_dst = np.array([[0.0, 40.0, 0.0], [40.0, 40.0, 0.0], [40.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
+    # h, status = cv2.getPerspectiveTransform(pts_src, pts_dst)
+    h, status = cv2.findHomography(pts_src[:,:2], pts_dst[:,:2]) # Only grab X,Y axis, because findhomography needs 2d points
+
+    homo_pts = cv2.perspectiveTransform(exp_data[['x', 'y']].values.reshape((-1,1,2)), h).reshape((-1,2))
+
+    # Update data frame of experiment data.
+    exp_data['x'] = homo_pts[:,0]
+    exp_data['y'] = homo_pts[:,1]
     
     # scale the calibration points
     calib_data['corners_px_scaled'] = {}
-    calib_data['corners_px_scaled']['tl'] = calib_data['corners_px']['tl'] * scale
-    calib_data['corners_px_scaled']['tr'] = calib_data['corners_px']['tr'] * scale
-    calib_data['corners_px_scaled']['bl'] = calib_data['corners_px']['bl'] * scale
-    calib_data['corners_px_scaled']['br'] = calib_data['corners_px']['br'] * scale
+    calib_data['corners_px_scaled']['tl'] = pts_dst[0]
+    calib_data['corners_px_scaled']['tr'] = pts_dst[1]
+    calib_data['corners_px_scaled']['br'] = pts_dst[2]
+    calib_data['corners_px_scaled']['bl'] = pts_dst[3]
 
     # Return scaled up scene
     return calib_data, exp_data
@@ -405,20 +408,19 @@ def correct_perspective(calib_data, exp_data):
     t = B_centroid - R @ A_centroid
 
     # Try tranformation you found elsewhere
-    R1 = np.array([  [-1.,  0.,  0.],
-                    [ 0.,  0., -1.],
-                    [ 0., -1.,  0.]])
+    R1 = np.array(  [[ 0.98919328, -0.12556392,  0.07569918,],
+                    [ 0.1027148 ,  0.22505302, -0.96891734,],
+                    [ 0.10462473,  0.96622194,  0.23551821,]])
     
-    R2 = np.array([[ 0.99452382, -0.05808328, -0.08688332],
-                   [ 0.07663475,  0.97055163,  0.22837832],
-                   [ 0.07105978, -0.23378596,  0.9696879 ]])
+    R2 = np.array([[ 0.99979044,  0.01958034,  0.00597359],
+                   [-0.01957252,  0.99980751, -0.00136582],
+                   [-0.00599918,  0.00124862,  0.99998123]])
     
-    R = R2 @ R1
+    R3 = np.array([[ 9.99999540e-01, -1.49610272e-04, -9.47844489e-04],
+                   [ 1.49625869e-04,  9.99999989e-01,  1.63844060e-05],
+                   [ 9.47842027e-04, -1.65262205e-05,  9.99999551e-01]])
 
-
-    t = np.array([  [251.61473978],
-                    [ 53.66651764],
-                    [ 65.91171718]])
+    R = R3 @ R2 @ R1
     
     t = B_centroid - R @ A_centroid
 
@@ -426,69 +428,6 @@ def correct_perspective(calib_data, exp_data):
     correct_points = correct_points.T
 
     correct_corners = (R@A + t).T
-    # correct_corners = (A).T
-
-    # Update dataframe
-    exp_data['Rt_x'] = correct_points[:,0]
-    exp_data['Rt_y'] = correct_points[:,1]
-    exp_data['Rt_z'] = correct_points[:,2]
-
-    # Add information to the calib data dictionary
-    calib_data['corners_px_Rt'] = {}
-    calib_data['corners_px_Rt']['tl'] = correct_corners[0]
-    calib_data['corners_px_Rt']['tr'] = correct_corners[1]
-    calib_data['corners_px_Rt']['bl'] = correct_corners[2]
-    calib_data['corners_px_Rt']['br'] = correct_corners[3]
-
-    return exp_data
-
-def correct_perspective_2(calib_data, lh_data, exp_data):
-    """
-     THIS FUNCTION DOESN'T WORK - DO NOT USE
-    Create a rotation and translation vector to move the reconstructed grid onto the origin for better comparison.
-    Using an SVD, according to: https://nghiaho.com/?page_id=671
-    """
-    
-    A = lh_data[['LH_x', 'LH_y', 'LH_z']].to_numpy().reshape((-1,3))
-    B = exp_data[['x', 'y', 'z']].to_numpy().reshape((-1,3))
-
-    # Get  all the reconstructed points
-    A2 = np.array([calib_data['corners_px_scaled'][corner] for corner in ['tl', 'tr', 'bl', 'br']]).reshape((4,3)).T
-
-    # Convert the point to column vectors,
-    # to match twhat the SVD algorithm expects
-    A = A.T
-    B = B.T
-
-
-    # Get the centroids
-    A_centroid = A.mean(axis=1).reshape((-1,1))
-    B_centroid = B.mean(axis=1).reshape((-1,1))
-
-    # Get H
-    H = (A - A_centroid) @ (B - B_centroid).T
-
-    # Do the SVD
-    U, S, V = np.linalg.svd(H)
-
-    # Get the rotation matrix
-    R = V @ U.T
-
-    # check for errors, and run the correction
-    if np.linalg.det(R) < 0:
-        U, S, V = np.linalg.svd(R)
-        V[:,2] = -1*V[:,2]
-        R = V @ U.T
-
-    # Get the ideal translation
-    t = B_centroid - R @ A_centroid
-    
-    t = B_centroid - R @ A_centroid
-
-    correct_points = (R@A + t)
-    correct_points = correct_points.T
-
-    correct_corners = (R@A2 + t).T
     # correct_corners = (A).T
 
     # Update dataframe
@@ -563,7 +502,7 @@ def plot_reconstructed_3D_scene(point3D, t_star, R_star, calib_data=None, exp_da
         # ax.scatter(cam_point3D[:,0], cam_point3D[:,1], cam_point3D[:,2], alpha=1, color="xkcd:gray", label="camera")
 
         cam_point3D_Rt = exp_data[['Rt_x','Rt_y','Rt_z']].values
-        ax.scatter(cam_point3D_Rt[:,0], cam_point3D_Rt[:,1], cam_point3D_Rt[:,2], alpha=0.2, color="xkcd:red", label="camera")
+        ax.scatter(cam_point3D_Rt[:,0], cam_point3D_Rt[:,1], cam_point3D_Rt[:,2], alpha=0.1, color="xkcd:red", label="camera")
 
 
     # R_1 = np.eye(3,dtype='float64')
@@ -683,7 +622,6 @@ if __name__ == "__main__":
 
         # Find the transform that superimposes one dataset over the other.
         exp_data = correct_perspective(calib_data, exp_data)
-        # exp_data = correct_perspective_2(calib_data, df[color], exp_data)
 
         # Add The 3D point to the Dataframe that has the real coordinates, timestamps etc.
         # This will help correlate which point are supposed to go where.
