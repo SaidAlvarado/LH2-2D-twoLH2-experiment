@@ -207,7 +207,7 @@ def fil_solve_2d(pts_a, pts_b):
     R1 = np.linalg.inv(R1)
     R2 = np.linalg.inv(R2)
 
-    print(R1)
+    # print(R1)
 
     t1 = (e*v1+f*v3).reshape((3,1))
     t2 = (e*v1-f*v3).reshape((3,1))
@@ -445,6 +445,43 @@ def correct_perspective(calib_data, exp_data):
     return exp_data
 
 
+def plot_error_histogram(lh_data, exp_data):
+    """ 
+    Calculate and plot a histogram  of the error of the reconstructed points, vs. 
+    the ground truth.
+    """
+    # Extract needed data from the main dataframe
+    points = lh_data[['LH_x', 'LH_y', 'LH_z']].to_numpy()
+    ground_truth = exp_data[['Rt_x', 'Rt_y', 'Rt_z']].to_numpy()
+
+    # Calculate distance between points and their ground truth
+    errors =  np.linalg.norm(ground_truth - points, axis=1) * 10 # x10 To have the errors in milimeters
+    # print the mean and standard deviation
+    print(f"Mean Absolute Error = {errors.mean()} mm")
+    print(f"Root Mean Square Error = {np.sqrt((errors**2).mean())} mm")
+    print(f"Error Standard Deviation = {errors.std()} mm")
+
+    # prepare the plot
+    fig = plt.figure(layout="constrained")
+    gs = GridSpec(3, 3, figure = fig)
+    hist_ax    = fig.add_subplot(gs[0:3, 0:3])
+    axs = (hist_ax,)
+
+    # Plot the error histogram
+    n, bins, patches = hist_ax.hist(errors, 50, density=False)
+    hist_ax.axvline(x=errors.mean(), color='red', label="Mean")
+
+    for ax in axs:
+        ax.grid()
+        ax.legend()
+    
+    hist_ax.set_xlabel('Distance Error [mm]')
+    hist_ax.set_ylabel('Measurements')
+
+    plt.show()
+
+    return
+
 def plot_reconstructed_3D_scene(point3D, t_star, R_star, calib_data=None, exp_data=None):
     """
     Plot a 3D scene with the traingulated points previously calculated
@@ -469,8 +506,8 @@ def plot_reconstructed_3D_scene(point3D, t_star, R_star, calib_data=None, exp_da
 
     # Second lighthouse:
     t_star_rotated = np.array([t_star.item(0), t_star.item(1), t_star.item(2)])
-    print(R_star)
-    print(t_star_rotated)
+    # print(R_star)
+    # print(t_star_rotated)
     x_axis = np.array([-arrow_size,0,0])@np.linalg.inv(R_star)
     y_axis = np.array([0,arrow_size,0])@np.linalg.inv(R_star)
     z_axis = np.array([0,0,-arrow_size])@np.linalg.inv(R_star)
@@ -629,19 +666,11 @@ if __name__ == "__main__":
         #############################################################################
         ###                             Plotting                                  ###
         #############################################################################
-        # Plot X,Y,Z gridpoint distance histograms. If the dataset is real.
-        # if 'experimental' in data_file:
-        #     plot_distance_histograms(x_dist, y_dist, z_dist)
+        # Plot Error Histogram
+        plot_error_histogram(df[color], exp_data)
 
         # Plot 3D reconstructed scene
         plot_reconstructed_3D_scene(point3D, t_star * lh2_scale, R_star, calib_data, exp_data)
 
         # Plot projected views of the lighthouse
-        plot_projected_LH_views(pts_A, pts_B)
-
-        # Plot superimposed "captured data" vs. "ground truth", and error histogram
-        # plot_transformed_3D_data(df)
-        # plot_error_histogram(df)
-
-        # Plot error analysis
-        # df_plot = df_plot.loc[ (df_plot['Coplanar'] > 30) & (df_plot['MAE'] < 200)]
+        # plot_projected_LH_views(pts_A, pts_B)
