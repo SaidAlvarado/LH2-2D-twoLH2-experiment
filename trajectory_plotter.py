@@ -56,7 +56,7 @@ def import_data(data_file, experiment_file, calib_file):
     br = data.loc[ (data['timestamp'] > lh2_calib_time["br"][0]) & (data['timestamp'] < lh2_calib_time["br"][1])].mean(axis=0, numeric_only=True)
     
     # Slice the lh2 data to match the timestamps on the blender experiment
-    start = exp_data['timestamp'].iloc[0]
+    start = exp_data['timestamp'].iloc[0 + 18]  # Use the a point about 250ms later than the start of the dataset, to address the time delay correction that we will do later when we interpolate the data.
     end   = exp_data['timestamp'].iloc[-1]
     data = data.loc[ (data['timestamp'] > start) & (data['timestamp'] < end)]
 
