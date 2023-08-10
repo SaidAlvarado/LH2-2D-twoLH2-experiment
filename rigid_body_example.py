@@ -78,53 +78,42 @@ def kabsch_rigid_transform(A, B):
     
     return R, t
 
-# Example points
-# A = np.array([[304.22258184, 169.35194119, 0.], 
-#               [264.18925565, 168.28511852, 0.], 
-#               [303.56316036, 209.4004265 , 0.],
-#               [263.32708102, 208.43592785, 0.]])
 
-# Simplified problem
-# A = np.array([    [ 1,   -1,   0.],
-#                   [-1,   -1,   0.],
-#                   [ 1,    1,   0.],
-#                   [-1 ,   1,   0.]])  + np.array([283.82551972, 188.86835351,   0.])
+# Data to transform
+# A = np.array([  [ 0., 40.,  0.],
+#                 [40., 40.,  0.],
+#                 [ 0.,  0.,  0.],
+#                 [40.,  0.,  0.]])
 
-# Pre-transformed data.
-A = np.array([[ -52.60784206,   53.66651764, -103.44022401],
-            [ -12.57451587,   53.66651764, -102.37340134],
-            [ -51.94842058,   53.66651764, -143.48870932],
-            [ -11.71234124,   53.66651764, -142.52421067]]) - np.array([ -32.21077994,   53.66651764, -122.95663633])
+# A = np.array([[ -54.50592394,   56.11328204, -105.72469213],
+#               [ -14.93819274,   60.22187404, -101.53970293],
+#               [ -49.48336714,   47.11116124, -144.37356973],
+#               [  -9.91563594,   51.21975324, -140.18858053]])
+A = np.array([[ -54.35040672,   56.52564748, -105.58820791],
+              [ -14.68552029,   59.85329247, -101.63554113],
+              [ -49.73603958,   47.47974282, -144.27773152],
+              [ -10.07115316,   50.8073878 , -140.32506474]])
+A = A - A.mean(axis=0) # Center data around the origin
 
-
+# Target for the transformation
 B = np.array([[ -53.93304374,   56.61932146, -105.32713253], 
               [ -15.23000162,   59.8388264 , -101.55474765], 
               [ -49.58298373,   47.47285135, -144.35019901],
-              [ -10.09709066,   50.73507135, -140.59446611]]) - np.array([ -32.21077994,   53.66651764, -122.95663633])
+              [ -10.09709066,   50.73507135, -140.59446611]])
+B = B - B.mean(axis=0) # Center data around the origin
 
-# B = np.array([[-1 ,  0,  1],
-#               [ 1,   0,  1],
-#               [-1,   0, -1],
-#               [ 1,   0, -1]]) + np.array([ -32.21077994,   53.66651764, -122.95663633])
-
-# Compute transformation
-# R, t = kabsch_rigid_transform(A, B)
-# print("Rotation Matrix:\n", R)
-# print("Translation Vector:\n", t)
-# t = t.reshape((3,1))
-
+# Make the points column vectors
 At = A.T
 
-print(f"Coplanar error = {is_coplanar(B)}")
 
+# First round. Normal distribution, from -180 to +180 degrees
+n_iteration = int(1e7)
 best_R = None
 best_error = 1000000
-for i in range(int(1e6)):
+for i in range(n_iteration):
 
-    R = random_rotation_matrix(mean_x=-13.385892116357232, mean_y=-4.574583938784697, mean_z=3.901904790013345, std_dev=2)
-
+    R = random_rotation_matrix(mean_x=0, mean_y=0, mean_z=0, std_dev=2)
     C = (R @ At).T
-
     error = check_error(C, B)
 
     if error < best_error:
@@ -132,12 +121,11 @@ for i in range(int(1e6)):
         best_R = R
         print(f"best error = {best_error}")
 
+
 print(f"best R = {best_R}")
 print(f"A = {A}")
 print(f"B = {B}")
 print(f"(R @ At) = {(best_R @ At).T}")
-
-
 
 
 # Last best R
