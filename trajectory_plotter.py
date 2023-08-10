@@ -346,7 +346,8 @@ def interpolate_cam_data(lh_data, exp_data):
 
 
     # Offset the camera timestamp to get rid of the communication delay.
-    camera_np['time'] += 318109e-6 # seconds
+    camera_np['time'] += 265000e-6 # seconds
+    
 
     camera_np['x_interp_lh2'] = np.interp(lh2_np['time'], camera_np['time'],  camera_np['x'])
     camera_np['y_interp_lh2'] = np.interp(lh2_np['time'], camera_np['time'],  camera_np['y'])
