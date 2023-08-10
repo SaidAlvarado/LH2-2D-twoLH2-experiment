@@ -329,8 +329,43 @@ def scale_cam_to_real_size(calib_data, exp_data):
     # Return scaled up scene
     return calib_data, exp_data
 
+def interpolate_cam_data(lh_data, exp_data):
+
+
+    camera_np = {'time': exp_data['time_s'].to_numpy(),
+                'x':    exp_data['x'].to_numpy(),
+                'y':    exp_data['y'].to_numpy(),}
+
+
+    lh2_np = {'time':   lh_data['time_s'].to_numpy(),
+                'x':    lh_data['LH_x'],
+                'y':    lh_data['LH_y'],}
+
+
+    # Offset the camera timestamp to get rid of the communication delay.
+    camera_np['time'] += 318109e-6 # seconds
+
+    camera_np['x_interp_lh2'] = np.interp(lh2_np['time'], camera_np['time'],  camera_np['x'])
+    camera_np['y_interp_lh2'] = np.interp(lh2_np['time'], camera_np['time'],  camera_np['y'])
+
+
+    exp_data_interp = pd.DataFrame({
+                          'time_s' : lh2_np['time'],
+
+                          'source': exp_data['source'].iloc[0],
+
+                          'x': camera_np['x_interp_lh2'],
+
+                          'y': camera_np['y_interp_lh2'],
+
+                          'z': 0.0}
+                          )
+
+    return exp_data_interp
+
 def correct_perspective(calib_data, exp_data):
     """
+    THE SVD TECHNIQUE  FAILED, SO I HARDCODED T,R THAT I COMPUTED ELSEWHERE
     Create a rotation and translation vector to move the reconstructed grid onto the origin for better comparison.
     Using an SVD, according to: https://nghiaho.com/?page_id=671
     """
@@ -345,6 +380,7 @@ def correct_perspective(calib_data, exp_data):
     # to match twhat the SVD algorithm expects
     A = A.T
     B = B.T
+
 
     # Get the centroids
     A_centroid = A.mean(axis=1).reshape((-1,1))
@@ -368,10 +404,29 @@ def correct_perspective(calib_data, exp_data):
     # Get the ideal translation
     t = B_centroid - R @ A_centroid
 
+    # Try tranformation you found elsewhere
+    R1 = np.array([  [-1.,  0.,  0.],
+                    [ 0.,  0., -1.],
+                    [ 0., -1.,  0.]])
+    
+    R2 = np.array([[ 0.99452382, -0.05808328, -0.08688332],
+                   [ 0.07663475,  0.97055163,  0.22837832],
+                   [ 0.07105978, -0.23378596,  0.9696879 ]])
+    
+    R = R2 @ R1
+
+
+    t = np.array([  [251.61473978],
+                    [ 53.66651764],
+                    [ 65.91171718]])
+    
+    t = B_centroid - R @ A_centroid
+
     correct_points = (R@A2 + t)
     correct_points = correct_points.T
 
     correct_corners = (R@A + t).T
+    # correct_corners = (A).T
 
     # Update dataframe
     exp_data['Rt_x'] = correct_points[:,0]
@@ -387,6 +442,68 @@ def correct_perspective(calib_data, exp_data):
 
     return exp_data
 
+def correct_perspective_2(calib_data, lh_data, exp_data):
+    """
+     THIS FUNCTION DOESN'T WORK - DO NOT USE
+    Create a rotation and translation vector to move the reconstructed grid onto the origin for better comparison.
+    Using an SVD, according to: https://nghiaho.com/?page_id=671
+    """
+    
+    A = lh_data[['LH_x', 'LH_y', 'LH_z']].to_numpy().reshape((-1,3))
+    B = exp_data[['x', 'y', 'z']].to_numpy().reshape((-1,3))
+
+    # Get  all the reconstructed points
+    A2 = np.array([calib_data['corners_px_scaled'][corner] for corner in ['tl', 'tr', 'bl', 'br']]).reshape((4,3)).T
+
+    # Convert the point to column vectors,
+    # to match twhat the SVD algorithm expects
+    A = A.T
+    B = B.T
+
+
+    # Get the centroids
+    A_centroid = A.mean(axis=1).reshape((-1,1))
+    B_centroid = B.mean(axis=1).reshape((-1,1))
+
+    # Get H
+    H = (A - A_centroid) @ (B - B_centroid).T
+
+    # Do the SVD
+    U, S, V = np.linalg.svd(H)
+
+    # Get the rotation matrix
+    R = V @ U.T
+
+    # check for errors, and run the correction
+    if np.linalg.det(R) < 0:
+        U, S, V = np.linalg.svd(R)
+        V[:,2] = -1*V[:,2]
+        R = V @ U.T
+
+    # Get the ideal translation
+    t = B_centroid - R @ A_centroid
+    
+    t = B_centroid - R @ A_centroid
+
+    correct_points = (R@A + t)
+    correct_points = correct_points.T
+
+    correct_corners = (R@A2 + t).T
+    # correct_corners = (A).T
+
+    # Update dataframe
+    exp_data['Rt_x'] = correct_points[:,0]
+    exp_data['Rt_y'] = correct_points[:,1]
+    exp_data['Rt_z'] = correct_points[:,2]
+
+    # Add information to the calib data dictionary
+    calib_data['corners_px_Rt'] = {}
+    calib_data['corners_px_Rt']['tl'] = correct_corners[0]
+    calib_data['corners_px_Rt']['tr'] = correct_corners[1]
+    calib_data['corners_px_Rt']['bl'] = correct_corners[2]
+    calib_data['corners_px_Rt']['br'] = correct_corners[3]
+
+    return exp_data
 
 
 def plot_reconstructed_3D_scene(point3D, t_star, R_star, calib_data=None, exp_data=None):
@@ -421,21 +538,32 @@ def plot_reconstructed_3D_scene(point3D, t_star, R_star, calib_data=None, exp_da
     ax.quiver(t_star_rotated[0],t_star_rotated[1],t_star_rotated[2],x_axis[0],x_axis[1],x_axis[2], color='xkcd:blue',lw=3)
     ax.quiver(t_star_rotated[0],t_star_rotated[1],t_star_rotated[2],y_axis[0],y_axis[1],y_axis[2],color='xkcd:red',lw=3)
     ax.quiver(t_star_rotated[0],t_star_rotated[1],t_star_rotated[2],z_axis[0],z_axis[1],z_axis[2],color='xkcd:green',lw=3)
-    ax.scatter(point3D[:,0],point3D[:,1],point3D[:,2], alpha=0.1)
+    ax.scatter(point3D[:,0],point3D[:,1],point3D[:,2], alpha=0.1, label="lh2")
 
     # Plot the calibration points in the LHA reference frame
     if calib_data is not None:
         calib_lh2 = np.array([calib_data['corners_lh2_3D_scaled'][corner] for corner in ['tl','tr','bl','br']]).reshape((4,3)) # originally it came out as shape=(3,1,4), I'm removing th uneeded dimension
-        ax.scatter(calib_lh2[:,0],calib_lh2[:,1],calib_lh2[:,2], alpha=0.5, color="xkcd:red")
+        # ax.scatter(calib_lh2[:,0],calib_lh2[:,1],calib_lh2[:,2], alpha=0.5, color="xkcd:red")
+        ax.scatter(calib_lh2[0,0],calib_lh2[0,1],calib_lh2[0,2], alpha=1, color="xkcd:red")
+        ax.scatter(calib_lh2[1,0],calib_lh2[1,1],calib_lh2[1,2], alpha=1, color="xkcd:cyan")
+        ax.scatter(calib_lh2[2,0],calib_lh2[2,1],calib_lh2[2,2], alpha=1, color="xkcd:green")
+        ax.scatter(calib_lh2[3,0],calib_lh2[3,1],calib_lh2[3,2], alpha=1, color="xkcd:black")
 
     # Plot the Camera points, calibration and data
     if calib_data is not None and exp_data is not None:
         calib_cam = np.array([calib_data['corners_px_Rt'][corner] for corner in ['tl','tr','bl','br']])
-        ax.scatter(calib_cam[:,0],calib_cam[:,1],calib_cam[:,2], alpha=0.5, color="xkcd:orange")
-        cam_point3D = exp_data[['x','y','z']].values
-        # ax.scatter(cam_point3D[:,0], cam_point3D[:,1], cam_point3D[:,2], alpha=0.01, color="xkcd:gray")
-        # cam_point3D_Rt = exp_data[['Rt_x','Rt_y','Rt_z']].values
-        # ax.scatter(cam_point3D_Rt[:,0], cam_point3D_Rt[:,2], -cam_point3D_Rt[:,1], alpha=0.01, color="xkcd:gray")
+        # ax.scatter(calib_cam[:,0],calib_cam[:,1],calib_cam[:,2], alpha=0.5, color="xkcd:orange")
+
+        ax.scatter(calib_cam[0,0],calib_cam[0,1],calib_cam[0,2], alpha=1, color="xkcd:red")
+        ax.scatter(calib_cam[1,0],calib_cam[1,1],calib_cam[1,2], alpha=1, color="xkcd:cyan")
+        ax.scatter(calib_cam[2,0],calib_cam[2,1],calib_cam[2,2], alpha=1, color="xkcd:green")
+        ax.scatter(calib_cam[3,0],calib_cam[3,1],calib_cam[3,2], alpha=1, color="xkcd:black")
+
+        # cam_point3D = exp_data[['x','y','z']].values
+        # ax.scatter(cam_point3D[:,0], cam_point3D[:,1], cam_point3D[:,2], alpha=1, color="xkcd:gray", label="camera")
+
+        cam_point3D_Rt = exp_data[['Rt_x','Rt_y','Rt_z']].values
+        ax.scatter(cam_point3D_Rt[:,0], cam_point3D_Rt[:,1], cam_point3D_Rt[:,2], alpha=0.2, color="xkcd:red", label="camera")
 
 
     # R_1 = np.eye(3,dtype='float64')
@@ -455,6 +583,7 @@ def plot_reconstructed_3D_scene(point3D, t_star, R_star, calib_data=None, exp_da
     ax.text(t_star_rotated[0], t_star_rotated[1], t_star_rotated[2],s='LHB')
 
     ax.axis('equal')
+    ax.legend()
     ax.set_title('2D solved scene - 3D triangulated Points')
     ax.set_xlabel('X [mm]')
     ax.set_ylabel('Y [mm]')
@@ -538,7 +667,6 @@ if __name__ == "__main__":
         ####################################################################################
         ####################################################################################
 
-        # point3D = triangulate_solved_scene(pts_A, pts_B, t_star, R_star)
         point3D = solve_point_plane(n_star, zeta, pts_A)
 
         # Scale up the LH2 points
@@ -546,14 +674,19 @@ if __name__ == "__main__":
         # Scale up the camera points
         calib_data, exp_data = scale_cam_to_real_size(calib_data, exp_data)
 
-        # Find the transform that superimposes one dataset over the other.
-        exp_data = correct_perspective(calib_data, exp_data)
-
-        # Add The 3D point to the Dataframe that has the real coordinates, timestamps etc.
-        # This will help correlate which point are supposed to go where.
         df[color]['LH_x'] = point3D[:,0]
         df[color]['LH_y'] = point3D[:,1]   # We need to invert 2 of the axis because the LH2 frame Z == depth and Y == Height
         df[color]['LH_z'] = point3D[:,2]   # But the dataset assumes X = Horizontal, Y = Depth, Z = Height
+        
+        # Interpolate Camera data to match the time base of the LH2 data
+        exp_data = interpolate_cam_data(df[color], exp_data) 
+
+        # Find the transform that superimposes one dataset over the other.
+        exp_data = correct_perspective(calib_data, exp_data)
+        # exp_data = correct_perspective_2(calib_data, df[color], exp_data)
+
+        # Add The 3D point to the Dataframe that has the real coordinates, timestamps etc.
+        # This will help correlate which point are supposed to go where.
 
         #############################################################################
         ###                             Plotting                                  ###
