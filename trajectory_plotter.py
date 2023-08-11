@@ -12,10 +12,6 @@ import cv2
 ###                                Options                                ###
 #############################################################################
 
-USE_CAMERA_MATRIX = False  
-N_POINTS = 100 
-N_ITERATIONS = 300
-
 # file with the data to analyze
 data_file = './data.csv'
 experiment_file = './video_track/4_blender.csv'  
