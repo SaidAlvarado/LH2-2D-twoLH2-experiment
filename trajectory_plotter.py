@@ -564,6 +564,101 @@ def plot_reconstructed_3D_scene(point3D, t_star, R_star, calib_data=None, exp_da
 
     plt.show()
 
+def plot_ALL_reconstructed_3D_scene(df, exp_data, t_star, R_star, calib_data):
+    """
+
+    """
+    ## Plot the two coordinate systems
+    #  x is blue, y is red, z is green
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.set_proj_type('ortho')
+    # First lighthouse:
+    arrow_size = 10
+    # ax.quiver(0,0,0, -arrow_size,0,0, color='xkcd:blue',lw=3)   # Previous before changin the the reference frame to get a prettier looking plot
+    # ax.quiver(0,0,0, 0,-arrow_size,0, color='xkcd:red',lw=3)
+    # ax.quiver(0,0,0, 0,0,arrow_size, color='xkcd:green',lw=3)
+    ax.quiver(0,0,0, -arrow_size,0,0, color='xkcd:green',lw=3)
+    ax.quiver(0,0,0, 0,-arrow_size,0, color='xkcd:blue',lw=3)
+    ax.quiver(0,0,0, 0,0,arrow_size, color='xkcd:red',lw=3)
+
+    # Second lighthouse:
+    t_star_rotated = np.array([t_star.item(0), t_star.item(1), t_star.item(2)])
+    # print(R_star)
+    # print(t_star_rotated)
+    x_axis = np.array([-arrow_size,0,0])@np.linalg.inv(R_star)
+    y_axis = np.array([0,arrow_size,0])@np.linalg.inv(R_star)
+    z_axis = np.array([0,0,-arrow_size])@np.linalg.inv(R_star)
+    ax.quiver(t_star_rotated[2],t_star_rotated[0],t_star_rotated[1],x_axis[2],x_axis[0],x_axis[1], color='xkcd:blue',lw=3)
+    ax.quiver(t_star_rotated[2],t_star_rotated[0],t_star_rotated[1],y_axis[2],y_axis[0],y_axis[1],color='xkcd:red',lw=3)
+    ax.quiver(t_star_rotated[2],t_star_rotated[0],t_star_rotated[1],z_axis[2],z_axis[0],z_axis[1],color='xkcd:green',lw=3)
+
+    # Plot the calibration points in the LHA reference frame
+    if calib_data is not None:
+        calib_lh2 = np.array([calib_data['corners_lh2_3D_scaled'][corner] for corner in ['tl','tr','bl','br']]).reshape((4,3)) # originally it came out as shape=(3,1,4), I'm removing th uneeded dimension
+        # ax.scatter(calib_lh2[:,0],calib_lh2[:,1],calib_lh2[:,2], alpha=0.5, color="xkcd:red")
+        # ax.scatter(calib_lh2[0,2],calib_lh2[0,0],calib_lh2[0,1], alpha=1, s=4, color="xkcd:black")
+        # ax.scatter(calib_lh2[1,2],calib_lh2[1,0],calib_lh2[1,1], alpha=1, s=4, color="xkcd:black")
+        # ax.scatter(calib_lh2[2,2],calib_lh2[2,0],calib_lh2[2,1], alpha=1, s=4, color="xkcd:black")
+        # ax.scatter(calib_lh2[3,2],calib_lh2[3,0],calib_lh2[3,1], alpha=1, s=4, color="xkcd:black")
+
+    # Plot the Camera points, calibration and data
+    if calib_data is not None and exp_data is not None:
+        calib_cam = np.array([calib_data['corners_px_Rt'][corner] for corner in ['tl','tr','bl','br']])
+        # ax.scatter(calib_cam[:,2],calib_cam[:,0],calib_cam[:,1], alpha=0.5, color="xkcd:orange")
+
+        # ax.scatter(calib_cam[0,2],calib_cam[0,0],calib_cam[0,1], alpha=1, s=4, color="xkcd:black")
+        # ax.scatter(calib_cam[1,2],calib_cam[1,0],calib_cam[1,1], alpha=1, s=4, color="xkcd:black")
+        # ax.scatter(calib_cam[2,2],calib_cam[2,0],calib_cam[2,1], alpha=1, s=4, color="xkcd:black")
+        # ax.scatter(calib_cam[3,2],calib_cam[3,0],calib_cam[3,1], alpha=1, s=4, color="xkcd:black")
+
+        # cam_point3D = exp_data[['x','y','z']].values
+        # ax.scatter(cam_point3D[:,0], cam_point3D[:,1], cam_point3D[:,2], alpha=1, color="xkcd:gray", label="camera")
+
+
+    for color in ['R', 'G', 'B']:
+
+        point3D = df[color][['LH_x', 'LH_y','LH_z']].values
+        cam_point3D_Rt = exp_data[color][['Rt_x','Rt_y','Rt_z']].values
+
+        if color == 'R': 
+            c = 'xkcd:red'
+            label_lh = "Robot #1"
+            label_c  = None
+        if color == 'G': 
+            c = 'xkcd:green'
+            label_lh = "Robot #2"
+            label_c  = None
+        if color == 'B': 
+            c = 'xkcd:blue'
+            label_lh = "Robot #3"
+            label_c  = "Ground Truth"
+
+
+        if '4' in experiment_file and color == 'B':
+            ax.scatter(point3D[60:,2],point3D[60:,0],point3D[60:,1], alpha=0.5, color=c, s=4, label=label_lh)
+            ax.plot(cam_point3D_Rt[60:,2], cam_point3D_Rt[60:,0], cam_point3D_Rt[60:,1], alpha=0.5, color="xkcd:black", label=label_c)
+        else:
+            ax.scatter(point3D[:,2],point3D[:,0],point3D[:,1], alpha=0.5, color=c, s=4, label=label_lh)
+            ax.plot(cam_point3D_Rt[:,2], cam_point3D_Rt[:,0], cam_point3D_Rt[:,1], alpha=0.5, color="xkcd:black", label=label_c)
+
+        # ax.scatter(cam_point3D_Rt[:,0], cam_point3D_Rt[:,1], cam_point3D_Rt[:,2], alpha=0.2, color="xkcd:black", label=label_c)
+
+
+    # Plot the real 
+    ax.text(-0.18,-0.1,0,s='LHA')
+    ax.text(t_star_rotated[2], t_star_rotated[0], t_star_rotated[1],s='LHB')
+
+    ax.axis('equal')
+    ax.legend()
+    ax.set_title('2D solved scene - 3D triangulated Points')
+    ax.set_xlabel('X [cm]')
+    ax.set_ylabel('Y [cm]')
+    ax.set_zlabel('Z [cm]')   
+
+    plt.show()
+
 def plot_projected_LH_views(pts_a, pts_b):
     """
     Plot the projected views from each of the lighthouse
@@ -669,10 +764,13 @@ if __name__ == "__main__":
         ###                             Plotting                                  ###
         #############################################################################
         # Plot Error Histogram
-        plot_error_histogram(df[color], exp_data[color])
+        # plot_error_histogram(df[color], exp_data[color])
 
         # Plot 3D reconstructed scene
-        plot_reconstructed_3D_scene(point3D, t_star * lh2_scale, R_star, calib_data, exp_data[color])
+        # plot_reconstructed_3D_scene(point3D, t_star * lh2_scale, R_star, calib_data, exp_data[color])
 
         # Plot projected views of the lighthouse
-        plot_projected_LH_views(pts_A, pts_B)
+        # plot_projected_LH_views(pts_A, pts_B)
+
+    # Plot all the data at the same time.
+    plot_ALL_reconstructed_3D_scene(df, exp_data, t_star * lh2_scale, R_star, calib_data)
