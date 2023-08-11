@@ -18,7 +18,7 @@ N_ITERATIONS = 300
 
 # file with the data to analyze
 data_file = './data.csv'
-experiment_file = './video_track/1_blender.csv'  
+experiment_file = './video_track/3_blender.csv'  
 calib_file = './video_track/calibration.json'
 
 #############################################################################
@@ -562,9 +562,9 @@ def plot_reconstructed_3D_scene(point3D, t_star, R_star, calib_data=None, exp_da
     ax.axis('equal')
     ax.legend()
     ax.set_title('2D solved scene - 3D triangulated Points')
-    ax.set_xlabel('X [mm]')
-    ax.set_ylabel('Y [mm]')
-    ax.set_zlabel('Z [mm]')   
+    ax.set_xlabel('X [cm]')
+    ax.set_ylabel('Y [cm]')
+    ax.set_zlabel('Z [cm]')   
 
     plt.show()
 
@@ -629,21 +629,21 @@ if __name__ == "__main__":
 
         # Solve the scene to find the transformation R,t from LHA to LHB
         # t_star, R_star, n_star, zeta = solve_2d_scene_get_Rtn(pts_A, pts_B)
-        solution_1, solution_2, zeta = fil_solve_2d(pts_A, pts_B)
-        t_star, R_star, n_star = solution_1
+        # solution_1, solution_2, zeta = fil_solve_2d(pts_A, pts_B)
+        # t_star, R_star, n_star = solution_1
 
+        # Solve the scene witht the blender_1.csv file, and then reuse that solution for the rest of the experiment
+        t_star = np.array([[-0.99037204], [-0.04119019], [-0.13216125]])
+        R_star =  np.array([[ 0.79756361, -0.28569461, -0.53129171],
+                            [ 0.23989689,  0.95831365, -0.1551916 ],
+                            [ 0.5534815 , -0.00368005,  0.83285334]])
+        n_star = np.array([-0.05719626,  0.97055711, -0.23398181])
+        zeta = 1.2583023961808537
 
+        # Convert the for 4 calibration points from a LH projection to a 3D point
         calib_data = process_calibration(n_star, zeta, calib_data)
 
-        ####################################################################################
-        ####################################################################################
-        ### TODO, reconstruction is flipped horizontally
-        ### Get the camera points, do the interpolation so that you have the time correspondent points
-        ### Get the Scale and R,t transofrmation so super impose both cloud points (Make a function to read and get the transformation from the 4 calibration points. )
-        ### Run the transfor, do the comparison.
-        ####################################################################################
-        ####################################################################################
-
+        # Transform LH projected points into 3D
         point3D = solve_point_plane(n_star, zeta, pts_A)
 
         # Scale up the LH2 points
