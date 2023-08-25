@@ -571,7 +571,7 @@ def plot_ALL_reconstructed_3D_scene(df, exp_data, t_star, R_star, calib_data):
     ## Plot the two coordinate systems
     #  x is blue, y is red, z is green
 
-    fig = plt.figure()
+    fig = plt.figure(layout="constrained", figsize=(5,4))
     ax = fig.add_subplot(111, projection='3d')
     ax.set_proj_type('ortho')
     # First lighthouse:
@@ -650,13 +650,21 @@ def plot_ALL_reconstructed_3D_scene(df, exp_data, t_star, R_star, calib_data):
     ax.text(-0.18,-0.1,0,s='LHA')
     ax.text(t_star_rotated[2], t_star_rotated[0], t_star_rotated[1],s='LHB')
 
-    ax.axis('equal')
+
     ax.legend()
-    ax.set_title('2D solved scene - 3D triangulated Points')
+    ax.axis('equal')
+    # ax.set_title('2D solved scene - 3D triangulated Points')
     ax.set_xlabel('X [cm]')
     ax.set_ylabel('Y [cm]')
     ax.set_zlabel('Z [cm]')   
 
+    # Set Viewing orientation and zoom of the plot
+    ax.view_init(-142,32, 0)
+    ax.set_xlim3d((-144.424, -26.672))
+    ax.set_ylim3d((-105, 13.6))
+    ax.set_zlim3d((-20, 80))
+
+    plt.savefig('Result-C-2lh_2d-solvedscene.pdf')
     plt.show()
 
 def plot_projected_LH_views(pts_a, pts_b):
