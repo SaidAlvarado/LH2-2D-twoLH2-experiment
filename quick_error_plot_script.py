@@ -11,6 +11,9 @@ import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 import cv2
 
+
+import seaborn as sns
+
 errors = np.array([ 8.96709775,  9.48813162, 10.1128299 ,  8.79067917,  8.69783374,   # experiment 1
        10.72547084,  9.57945014,  9.9769595 , 10.08815274,  4.83449008,
         6.36685276,  4.46445687,  4.85650631,  3.39487254,  5.79308883,
@@ -256,21 +259,36 @@ print(f"Root Mean Square Error = {np.sqrt((errors**2).mean())} mm")
 print(f"Error Standard Deviation = {errors.std()} mm")
 
 # prepare the plot
-fig = plt.figure(layout="constrained")
+fig = plt.figure(layout="constrained", figsize=(5,4))
 gs = GridSpec(3, 3, figure = fig)
 hist_ax    = fig.add_subplot(gs[0:3, 0:3])
 axs = (hist_ax,)
 
 # Plot the error histogram
-n, bins, patches = hist_ax.hist(errors, 50, density=False)
-hist_ax.axvline(x=errors.mean(), color='red', label="Mean")
+# n, bins, patches = hist_ax.hist(errors, 50, density=False)
+# hist_ax.axvline(x=errors.mean(), color='red', label="Mean")
+# Sea-born KDE histogram plot
+sns.histplot(data=errors,  bins=50, ax=hist_ax, linewidth=0, color="xkcd:baby blue")
+hist_ax.set_xlim((0, 20))
+ax2 = hist_ax.twinx()
+sns.kdeplot(data=errors, ax=ax2, label="density", color="xkcd:black", linewidth=1, linestyle='--')
+
+hist_ax.axvline(x=errors.mean(), color='xkcd:red', label="Mean")
+# Trick to get the legend  unified between the TwinX plots
+hist_ax.plot([], [], color="xkcd:black", linestyle='--', label = 'density')
+
+xticks_locs = np.linspace(0, 20, 5)  # 5 x-ticks from 0 to 10
+hist_ax.set_xticks(xticks_locs)
 
 for ax in axs:
-    ax.grid()
+    # ax.grid()
     ax.legend()
 
-hist_ax.set_title('twoLH-2D Accuracy Analysis')
+# hist_ax.set_title('twoLH-2D Accuracy Analysis')
 hist_ax.set_xlabel('Distance Error [mm]')
-hist_ax.set_ylabel('Measurements [#]')
+hist_ax.set_ylabel('Measurements')
+
+plt.savefig('Result-D-2lh_2d-histogram.pdf')
 
 plt.show()
+
