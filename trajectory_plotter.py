@@ -659,7 +659,7 @@ def plot_ALL_reconstructed_3D_scene(df, exp_data, t_star, R_star, calib_data):
     ax.set_zlabel('Z [cm]')   
 
     # Set Viewing orientation and zoom of the plot
-    ax.view_init(-142,32, 0)
+    ax.view_init(-142,38, 0)
     ax.set_xlim3d((-144.424, -26.672))
     ax.set_ylim3d((-105, 13.6))
     ax.set_zlim3d((-20, 80))
